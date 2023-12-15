@@ -4,6 +4,8 @@ import glob
 import numpy as np
 import os 
 import sys
+import torch
+from torchvision import transforms as T
 from tqdm.auto import tqdm
 from PIL import Image
 

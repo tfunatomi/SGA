@@ -188,20 +188,20 @@ def finetune(config,base_epoch=-1):
         
         for k, fine_epoch in enumerate(config['FINETUNE_CONFIG']['FINETUNE_EPOCHS']):
             if k==0 or config['FINETUNE_CONFIG']['FINETUNE_EPOCHS'][k-1]>fine_epoch:
-                solver = Solver(config, test_loader)
+                solver = Solver(config, get_loader(config,FinetuneDataSet))
                 base_epoch = solver.restore_model(base_epoch)
                 solver.epoch = base_epoch+fine_epoch
-                time_offset = [0, 0]
+                time_offset = 0
             else: # resume finetuning
                 prev_epoch = config['FINETUNE_CONFIG']['FINETUNE_EPOCHS'][k-1]
                 base_epoch = solver.epoch
                 solver.epoch = base_epoch+fine_epoch-prev_epoch
-                time_offset = [timeFT_log[(d,prev_epoch)], timeTT_log[(d,prev_epoch)]]
+                time_offset = timeFT_log[(d,prev_epoch)]
             
-            solver.log_dir = os.path.join(d,config['FINETUNE_CONFIG']['LOG_DIR'])
             solver.sample_dir = os.path.join(d,config['FINETUNE_CONFIG']['SAMPLE_DIR'])
-            
+            # solver.log_dir = os.path.join(d,config['FINETUNE_CONFIG']['LOG_DIR'])
             # solver.result_dir = os.path.join(d,config['FINETUNE_CONFIG']['RESULT_DIR'])
+            solver.log_dir = os.path.join(config['FINETUNE_CONFIG']['DATA_DIR'])
             solver.result_dir = os.path.join(config['FINETUNE_CONFIG']['DATA_DIR'],config['FINETUNE_CONFIG']['RESULT_DIR'],
                                              config['TRAINING_CONFIG']['TRAIN_DIR'],'ft%03d'%fine_epoch,os.path.split(d)[-1])
             
@@ -210,8 +210,8 @@ def finetune(config,base_epoch=-1):
                 os.makedirs(tmp,exist_ok=True)
 
             start_time = time.time()
-            solver.train(store_checkpoint=False, store_sample=False, resume_epoch=base_epoch)
-            et = time.time() - start_time + time_offset[0]
+            solver.train(store_checkpoint=False, store_sample=False, resume_epoch=base_epoch, load_model=(time_offset==0))
+            et = time.time() - start_time + time_offset
             print('{}: Epoch {} finetuning is finished. [{}]'.format(d,fine_epoch,str(datetime.timedelta(seconds=et))[:-7]))
             timeFT_log[(d,fine_epoch)] = et
             
@@ -225,10 +225,10 @@ def finetune(config,base_epoch=-1):
                     image_save(result_org,
                                #torch.concat([ref,torch.tile(skt,dims=(1,3,1,1)),result],axis=-1),
                                fID[0],solver.result_dir)
-            et = time.time() - start_time + time_offset[1]
+            et = time.time() - start_time
             print('{}: Epoch {} testing is finished. [{}]'.format(d,fine_epoch,str(datetime.timedelta(seconds=et))[:-7]))
             timeTT_log[(d,fine_epoch)] = et
-    
+            
     with open(os.path.join(solver.log_dir, 'time.log'), 'w') as fout:
         json.dump({'finetuning':{str(k):str(datetime.timedelta(seconds=t))[:-7] for k, t in timeFT_log.items()}, 
                    'testing':{str(k):str(datetime.timedelta(seconds=t))[:-7] for k, t in timeTT_log.items()}, },
@@ -243,6 +243,6 @@ if __name__ == '__main__':
     if os.path.exists(params.config):
         config = yaml.load(open(params.config, 'r'), Loader=yaml.FullLoader)
         # make_train_directory(config)
-        finetune(config)
+        finetune(config, 40)
     else:
         print("Please check your config yaml file")

@@ -260,7 +260,7 @@ class Solver(object):
         loss_dict['D/loss_real'] = self.lambda_d_real * d_loss_real.item()
         loss_dict['D/loss_fake'] = self.lambda_d_fake * d_loss_fake.item()
 
-    def train(self, store_checkpoint=True, store_sample=True, resume_epoch=-1):
+    def train(self, store_checkpoint=True, store_sample=True, resume_epoch=-1, load_model=True):
 
         # Set data loader.
         data_loader = self.data_loader
@@ -285,8 +285,12 @@ class Solver(object):
         # Learning rate cache for decaying.
         g_lr = self.g_lr
         d_lr = self.d_lr
+        
+        if load_model:
+            start_epoch = self.restore_model(resume_epoch)
+        else:
+            start_epoch = resume_epoch
 
-        start_epoch = self.restore_model(resume_epoch)
         start_time = time.time()
         if self.verbose:
             print('Start training...')
