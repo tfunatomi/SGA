@@ -245,8 +245,8 @@ class GNN(nn.Module):
     def __init__(self, channel):
         super(GNN, self).__init__()
         self.channel = channel
-        self.gcn3 = Gconv(in_features=channel, out_features=channel)
-        self.gcn4 = Gconv(in_features=channel, out_features=channel)
+        self.gcn3 = Gconv(in_ch=channel, out_ch=channel)
+        self.gcn4 = Gconv(in_ch=channel, out_ch=channel)
 
     @staticmethod
     def build_graph(src, tgt):
@@ -302,7 +302,7 @@ class GNN(nn.Module):
 
         ggen = self.gcn4(A=gg, source=gen, message=gen) + gen
 
-        return ggen, skt, ggen
+        return ggen, skt, gen
 
     def att(self, skt, ref):
         b, c, h, w = skt.size()

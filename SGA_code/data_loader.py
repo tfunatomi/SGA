@@ -18,7 +18,12 @@ class DataSet(data.Dataset):
 
         if config['TRAINING_CONFIG']['TRAIN_DIR'] == 'anime':
             self.img_dir = './anime/train2'
-            self.skt_dir = './anime/train0'
+            self.skt_dir = './anime/train3'
+            # self.skt_dir = './anime/train0'
+            self.data_list = glob.glob(os.path.join(self.img_dir, '*.png'))
+        elif config['TRAINING_CONFIG']['TRAIN_DIR'] == 'kaggle':
+            self.img_dir = './kaggle/train2'
+            self.skt_dir = './kaggle/train3'
             self.data_list = glob.glob(os.path.join(self.img_dir, '*.png'))
         elif config['TRAINING_CONFIG']['TRAIN_DIR'] == 'afhq_cat':
             self.img_dir = './afhq/train/cat'
@@ -79,8 +84,7 @@ class DataSet(data.Dataset):
         return len(self.data_list)
 
 
-def get_loader(config):
-
+def get_loader(config, DataSet=DataSet):
     img_transform_gt = list()
     img_transform_sketch = list()
     img_size = config['MODEL_CONFIG']['IMG_SIZE']

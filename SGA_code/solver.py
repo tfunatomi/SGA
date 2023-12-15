@@ -101,6 +101,7 @@ class Solver(object):
 
         self.d_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.D.parameters()), self.d_lr,
                                             (self.beta1, self.beta2))
+        self.verbose = config['TRAINING_CONFIG'].get('VERBOSE',True)
         self.build_model()
 
     def build_model(self):
@@ -114,8 +115,9 @@ class Solver(object):
         self.vgg.features[26].register_forward_hook(get_activation('relu_26'))
         self.vgg.features[35].register_forward_hook(get_activation('relu_35'))
         """
-        self.print_network(self.G, 'G')
-        self.print_network(self.D, 'D')
+        if self.verbose:
+            self.print_network(self.G, 'G')
+            self.print_network(self.D, 'D')
 
     def print_network(self, model, name):
         """Print out the network information."""
@@ -148,29 +150,31 @@ class Solver(object):
         out = (x + 1) / 2
         return out.clamp_(0, 1)
 
-    def restore_model(self):
-
-        pth_list = glob.glob(osp.join(self.model_dir, '*-G.pth'))
-
-        if len(pth_list) == 0:
-            return 0
-
-        pth_list = [int(osp.basename(x).split("-")[0]) for x in pth_list]
-        pth_list.sort()
-        epoch = pth_list[-1]
+    def restore_model(self, epoch=-1):
+        # print('Seek models: {}'.format(osp.join(self.model_dir, '*-G.pth')))
+        if epoch==-1:
+            pth_list = glob.glob(osp.join(self.model_dir, '*-G.pth'))
+            if len(pth_list) == 0:
+                return 0
+            pth_list = [int(osp.basename(x).split("-")[0]) for x in pth_list]
+            pth_list.sort()
+            epoch = pth_list[-1]
+            
         G_path = os.path.join(self.model_dir, '{}-G.pth'.format(epoch))
         D_path = os.path.join(self.model_dir, '{}-D.pth'.format(epoch))
 
-        G_checkpoint = torch.load(G_path)
+        G_checkpoint = torch.load(G_path, map_location=self.gpu)
         self.G.load_state_dict(G_checkpoint['model'])
         self.g_optimizer.load_state_dict(G_checkpoint['optimizer'])
 
-        D_checkpoint = torch.load(D_path)
+        D_checkpoint = torch.load(D_path, map_location=self.gpu)
         self.D.load_state_dict(D_checkpoint['model'])
         self.d_optimizer.load_state_dict(D_checkpoint['optimizer'])
 
         self.G.to(self.gpu)
         self.D.to(self.gpu)
+        
+        # print('Model loaded: {}, {}'.format(G_path, D_path))
         return epoch
 
     def image_reporting(self, fixed_sketch, fixed_reference, fixed_elastic_reference, epoch, postfix=''):
@@ -256,12 +260,13 @@ class Solver(object):
         loss_dict['D/loss_real'] = self.lambda_d_real * d_loss_real.item()
         loss_dict['D/loss_fake'] = self.lambda_d_fake * d_loss_fake.item()
 
-    def train(self):
+    def train(self, store_checkpoint=True, store_sample=True, resume_epoch=-1):
 
         # Set data loader.
         data_loader = self.data_loader
         iterations = len(self.data_loader)
-        print('iterations : ', iterations)
+        if self.verbose:
+            print('iterations : ', iterations)
 
         data_iter = iter(data_loader)
         _, fixed_elastic_reference, fixed_reference, fixed_sketch = next(data_iter)
@@ -281,9 +286,10 @@ class Solver(object):
         g_lr = self.g_lr
         d_lr = self.d_lr
 
-        start_epoch = self.restore_model()
+        start_epoch = self.restore_model(resume_epoch)
         start_time = time.time()
-        print('Start training...')
+        if self.verbose:
+            print('Start training...')
         for e in range(start_epoch, self.epoch):
 
             for i in range(iterations):
@@ -317,11 +323,12 @@ class Solver(object):
 
             if (e + 1) % self.sample_step == 0:
                 self.G.eval()
-                with torch.no_grad():
-                    self.image_reporting(fixed_sketch, fixed_reference, fixed_elastic_reference, e + 1, postfix='')
-                    self.image_reporting(shifted_fixed_sketch, fixed_reference, fixed_elastic_reference,
-                                         e + 1, postfix='_shifted')
-                    print('Saved real and fake images into {}...'.format(self.sample_dir))
+                if store_sample:
+                    with torch.no_grad():
+                        self.image_reporting(fixed_sketch, fixed_reference, fixed_elastic_reference, e + 1, postfix='')
+                        self.image_reporting(shifted_fixed_sketch, fixed_reference, fixed_elastic_reference,
+                                             e + 1, postfix='_shifted')
+                        print('Saved real and fake images into {}...'.format(self.sample_dir))
                 self.G.train()
 
                 # Save model checkpoints.
@@ -332,11 +339,13 @@ class Solver(object):
                     G_state = {'model': self.G.state_dict(), 'optimizer': self.g_optimizer.state_dict()}
                     D_state = {'model': self.D.state_dict(), 'optimizer': self.d_optimizer.state_dict()}
 
-                    torch.save(G_state, G_path)
-                    torch.save(D_state, D_path)
-                    print('Saved model checkpoints into {}...'.format(self.model_dir))
+                    if store_checkpoint:
+                        torch.save(G_state, G_path)
+                        torch.save(D_state, D_path)
+                        print('Saved model checkpoints into {}...'.format(self.model_dir))
 
-        print('Training is finished')
+        if self.verbose:
+            print('Training is finished')
 
     def test(self):
         pass
