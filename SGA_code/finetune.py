@@ -189,13 +189,13 @@ def finetune(config,base_epoch=-1):
         for k, fine_epoch in enumerate(config['FINETUNE_CONFIG']['FINETUNE_EPOCHS']):
             if k==0 or config['FINETUNE_CONFIG']['FINETUNE_EPOCHS'][k-1]>fine_epoch:
                 solver = Solver(config, get_loader(config,FinetuneDataSet))
-                base_epoch = solver.restore_model(base_epoch)
-                solver.epoch = base_epoch+fine_epoch
+                resume_epoch = solver.restore_model(base_epoch)
+                solver.epoch = resume_epoch+fine_epoch
                 time_offset = 0
             else: # resume finetuning
                 prev_epoch = config['FINETUNE_CONFIG']['FINETUNE_EPOCHS'][k-1]
-                base_epoch = solver.epoch
-                solver.epoch = base_epoch+fine_epoch-prev_epoch
+                resume_epoch = solver.epoch
+                solver.epoch = resume_epoch+fine_epoch-prev_epoch
                 time_offset = timeFT_log[(d,prev_epoch)]
             
             solver.sample_dir = os.path.join(d,config['FINETUNE_CONFIG']['SAMPLE_DIR'])
@@ -210,7 +210,7 @@ def finetune(config,base_epoch=-1):
                 os.makedirs(tmp,exist_ok=True)
 
             start_time = time.time()
-            solver.train(store_checkpoint=False, store_sample=False, resume_epoch=base_epoch, load_model=(time_offset==0))
+            solver.train(store_checkpoint=False, store_sample=False, resume_epoch=resume_epoch, load_model=(time_offset==0))
             et = time.time() - start_time + time_offset
             print('{}: Epoch {} finetuning is finished. [{}]'.format(d,fine_epoch,str(datetime.timedelta(seconds=et))[:-7]))
             timeFT_log[(d,fine_epoch)] = et
